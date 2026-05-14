@@ -1,0 +1,17 @@
+venv/
+*.pyc
+__pycache__/
+db.sqlite3
+.env
+media/
+
+/RealGarage/videos/*
+/videos/*
+
+!/RealGarage/videos/.gitkeep
+!/videos/.gitkeep
+
+*.mp4
+*.avi
+*.mkv
+*.zip
