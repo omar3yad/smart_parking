@@ -1,4 +1,0 @@
-Watching for file changes with StatReloader
-Not Found: /api/tracking/
-"POST /api/tracking/ HTTP/1.1" 404 70
-/root/Smart-Parking-System/smart-parking-system-main/core/settings.py changed, reloading.

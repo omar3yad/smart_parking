@@ -11,6 +11,8 @@ media/
 !/RealGarage/videos/.gitkeep
 !/videos/.gitkeep
 
+tracking_debug.log
+
 *.mp4
 *.avi
 *.mkv

@@ -10,6 +10,7 @@ from django.http import JsonResponse
 from django.db.models import Count
 from django.utils import timezone
 from django.db import transaction
+from datetime import timedelta
 from decimal import Decimal
 
 from .serializers import VehicleEntrySerializer, VehicleExitSerializer, SlotDisplaySerializer, ReservationSerializer, VehicleTrackSerializer, SlotStatusUpdateSerializer
@@ -18,8 +19,6 @@ from .pathfinding import astar, get_road_cell_next_to_slot
 from .permissions import IsCameraNode, IsOwnerOrAdmin
 from .grid import GARAGE_GRID, SLOT_COORDINATES
 
-from django.utils import timezone
-from datetime import timedelta
 
 import numpy as np
 import logging
@@ -35,10 +34,10 @@ SIMILAR_COLORS = {
     'gray':   ['silver', 'black', 'blue'],
     'white':  ['silver', 'gray'],
     'blue':   ['black', 'gray', 'silver'],
-    'brown':  ['beige', 'black'],
+    'brown':  ['beige', 'black', 'red'],
     'beige':  ['brown', 'white', 'yellow'],
     'yellow': ['beige', 'brown'],
-    'red':    ['red'],
+    'red':    ['red', 'brown'],
     'green':  ['green'],
 }
 
@@ -404,7 +403,7 @@ class VehicleTrackingAPIView(APIView):
         # تحديد الكاميرات السابقة المسموح بها بناءً على الخريطة
         allowed_previous_cameras = CAMERA_PATHS.get(camera_numeric_id, [])
 
-        time_threshold = timezone.now() - timedelta(minutes=3)  
+        time_threshold = timezone.now() - timedelta(seconds=90)  # نبحث عن السيارات اللي شافتها الكاميرات السابقة في آخر 90 ثانية
 
         # 1. فلترة ذكية لتقليل حجم البيانات المسحوبة (Optimization)
         queryset = VehicleLog.objects.filter(
@@ -414,7 +413,7 @@ class VehicleTrackingAPIView(APIView):
             car_embedding__isnull=False,
             last_camera_id__in=allowed_previous_cameras
         )
-        print(f"allowed_previous_cameras for camera {camera_numeric_id}: {allowed_previous_cameras}")
+        # print(f"allowed_previous_cameras for camera {camera_numeric_id}: {allowed_previous_cameras}")
 
         # if color_hint and color_hint != 'unknown':
         #     queryset = queryset.filter(car_color=color_hint)
