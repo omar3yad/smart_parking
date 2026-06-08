@@ -9,8 +9,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'password_confirm', 'email', 'first_name', 'last_name')
-
+        fields = ('username', 'email', 'first_name', 'last_name', 'password', 'password_confirm')
+        
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError({"password": "كلمات المرور غير متطابقة."})

@@ -19,7 +19,6 @@ from .pathfinding import astar, get_road_cell_next_to_slot
 from .permissions import IsCameraNode, IsOwnerOrAdmin
 from .grid import GARAGE_GRID, SLOT_COORDINATES
 
-
 import numpy as np
 import logging
 import json
@@ -27,15 +26,15 @@ import uuid
 import math
 import re
 
-ENTRANCE = (0, 1)   # ENTER cell
+ENTRANCE = (0, 1)
 SIMILAR_COLORS = {
-    'black':  ['gray', 'blue', 'brown'],
-    'silver': ['gray', 'white', 'blue'],
-    'gray':   ['silver', 'black', 'blue'],
-    'white':  ['silver', 'gray'],
-    'blue':   ['black', 'gray', 'silver'],
-    'brown':  ['beige', 'black', 'red'],
+    'black':  ['gray', 'blue', 'brown','silver'],
     'beige':  ['brown', 'white', 'yellow'],
+    'gray':   ['silver', 'black', 'blue'],
+    'blue':   ['black', 'gray', 'silver'],
+    'silver': ['gray', 'white', 'blue'],
+    'brown':  ['beige', 'black', 'red'],
+    'white':  ['silver', 'gray'],
     'yellow': ['beige', 'brown'],
     'red':    ['red', 'brown'],
     'green':  ['green'],
@@ -85,7 +84,7 @@ class VehicleEntryAPIView(APIView):
 
                 # 4. تحديث حالة المكان المحجوز/المخصص
                 if target_slot:
-                    target_slot.status = 'reserved' # أو reserved مؤقتاً
+                    target_slot.status = 'available' # أو reserved مؤقتاً
                     target_slot.save()
 
                 # 5. حفظ سجل الدخول
@@ -394,7 +393,7 @@ class VehicleTrackingAPIView(APIView):
             1: [1],          # بوابة الدخول
             2: [1],          
             3: [2],          
-            4: [3, 2],       
+            4: [3, 2,7],       
             5: [1, 2],  
             6: [5],       
             7: [6, 5],          
@@ -515,6 +514,9 @@ class VehicleTrackingAPIView(APIView):
                 "identified_plate": best_match.license_plate,
                 "confidence_score": round(max_combined_score, 4),
                 "color_score": round(color_score, 4),
+                "color_hint": incoming_color,
+                "color_matches": SIMILAR_COLORS.get(incoming_color, []),
+                
                 "current_zone": camera.zone_name,
                 "message": f"Vehicle {best_match.license_plate} tracked at {camera.zone_name}",
                 "tracking_msg": tracking_msg,
@@ -531,6 +533,9 @@ class VehicleTrackingAPIView(APIView):
                 "identified_plate": best_match.license_plate,
                 "embedding_score": round(cosine_sim, 4),
                 "color_score": round(color_score, 4),
+                "color_hint": incoming_color,
+                "color_matches": SIMILAR_COLORS.get(incoming_color, []),  
+                "current_camera": raw_camera_id,
                 "confidence_score": round(max_combined_score, 4),
                 "current_zone": camera.zone_name,
                 "message": f"Vehicle {best_match.license_plate} tracked at {camera.zone_name}",
@@ -542,6 +547,8 @@ class VehicleTrackingAPIView(APIView):
         #______________________________
         response_data = {
             "status": "Not Identified",
+            "color_hint": incoming_color,
+            "color_matches": SIMILAR_COLORS.get(incoming_color, []),
             "message": "Vehicle detected but could not be identified with high confidence",
             "color_score": round(color_score, 4) if 'color_score' in locals() else None,
             "embedding_score": round(cosine_sim, 4) if 'cosine_sim' in locals() else None,
@@ -554,6 +561,10 @@ class VehicleTrackingAPIView(APIView):
 
         return Response({
             "status": "Not Identified",
+            "color_score": round(color_score, 4),
+            "color_hint": incoming_color,
+            "color_matches": SIMILAR_COLORS.get(incoming_color, []),
+            "camera_id": raw_camera_id,
             "message": "Vehicle detected but could not be identified with high confidence",
             "Highest Confidence Score": round(max_combined_score, 4) if max_combined_score > -1 else None,
             "all_similarity_scores": similarity_results
