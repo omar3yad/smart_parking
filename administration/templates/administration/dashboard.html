@@ -126,7 +126,7 @@
     .sec-action:hover { text-decoration: underline; }
  
     /* ── SLOT MAP ── */
-    .slot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 24px; }
+    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px; margin-bottom: 24px; }
     .slot {
       border-radius: 8px; padding: 8px 4px; text-align: center;
       font-size: 11px; font-weight: 600; cursor: pointer;
@@ -641,44 +641,21 @@ async function loadDashboard() {
   }
 
   // Load slot map
-// Load slot map
-try {
+  try {
     const r = await apiFetch('/slots/');
-    let slots = await r.json();
+    const slots = await r.json();
     const sm = document.getElementById('slot-map');
     sm.innerHTML = '';
-
-    // الترتيب المخصص ليكون صفوف (A1, B1, C1... ثم A2, B2, C2...)
-    slots.sort((a, b) => {
-        // extract letters and numbers using regex
-        const regex = /([A-Z]+)(\d+)/i;
-        const matchA = a.slot_number.match(regex);
-        const matchB = b.slot_number.match(regex);
-
-        if (matchA && matchB) {
-            const charA = matchA[1], numA = parseInt(matchA[2]);
-            const charB = matchB[1], numB = parseInt(matchB[2]);
-
-            // 1. الترتيب الأول بناءً على الرقم (الصف)
-            if (numA !== numB) {
-                return numA - numB;
-            }
-            // 2. الترتيب الثاني بناءً على الحرف (العمود)
-            return charA.localeCompare(charB);
-        }
-        return 0;
-    });
-
     slots.forEach(sl => {
-        const d = document.createElement('div');
-        d.className = 'slot ' + sl.status;
-        d.innerHTML = `<span class="slot-num">${sl.slot_number}</span>${sl.status.charAt(0).toUpperCase()}`;
-        d.title = `${sl.slot_number} — ${sl.status}`;
-        sm.appendChild(d);
+      const d = document.createElement('div');
+      d.className = 'slot ' + sl.status;
+      d.innerHTML = `<span class="slot-num">${sl.slot_number}</span>${sl.status.charAt(0).toUpperCase()}`;
+      d.title = `${sl.slot_number} — ${sl.status}`;
+      sm.appendChild(d);
     });
-} catch (e) {
+  } catch (e) {
     document.getElementById('slot-map').innerHTML = '<div style="font-size:11px;color:var(--text3);padding:8px;">Could not load slots</div>';
-}
+  }
 
   // Load today's hourly chart from analytics
   try {
@@ -809,7 +786,7 @@ async function loadLogs() {
           <td>${l.slot_number || '—'}</td>
           <td>${new Date(l.entry_time).toLocaleString('en-US',{hour:'2-digit',minute:'2-digit',month:'short',day:'numeric'})}</td>
           <td>${l.exit_time ? new Date(l.exit_time).toLocaleString('en-US',{hour:'2-digit',minute:'2-digit',month:'short',day:'numeric'}) : '—'}</td>
-          <td>${l.duration_hours != null ? l.duration_hours + 'h' : '—'}</td>
+          <td>${l.duration_hours != null ? l.duration_hours + 'H' : '—'}</td>
           <td>${l.total_fee != null ? l.total_fee + ' EGP' : '—'}</td>
           <td>${l.is_paid ? '<span class="pill pill-green">Paid</span>' : (l.exit_time ? '<span class="pill pill-red">Unpaid</span>' : '<span class="pill pill-amber">Inside</span>')}</td>
           <td style="display:flex;gap:4px;">
