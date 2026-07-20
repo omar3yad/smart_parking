@@ -238,7 +238,7 @@ JSON
     "last_seen": "17:01:11"
 }
 ```
-
+```text
 root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "venv|.venv|__pycache__|lib|lib64|include|share"
 .
 ├── README.md
@@ -303,3 +303,4 @@ root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "ven
 
 26 directories, 468 files
 root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# 
+```
