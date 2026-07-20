@@ -239,7 +239,7 @@ JSON
 }
 ```
 ```text
-root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "venv|.venv|__pycache__|lib|lib64|include|share"
+(venv) root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "venv|.venv|__pycache__|lib|lib64|include|share"
 .
 ├── README.md
 ├── accounts
@@ -247,12 +247,16 @@ root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "ven
 │   ├── admin.py
 │   ├── apps.py
 │   ├── migrations
+│   │   ├── 0001_initial.py
 │   │   └── __init__.py
 │   ├── models.py
 │   ├── serializers.py
 │   ├── tests.py
 │   ├── urls.py
-│   └── views.py
+│   ├── views.py
+│   ├── web_forms.py
+│   ├── web_urls.py
+│   └── web_views.py
 ├── administration
 │   ├── __init__.py
 │   ├── admin.py
@@ -264,7 +268,13 @@ root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "ven
 │   ├── serializers.py
 │   ├── templates
 │   │   └── administration
-│   │       └── dashboard.html
+│   │       ├── base.html
+│   │       ├── d.html
+│   │       ├── dashboard.html
+│   │       ├── entry_gate.html
+│   │       ├── exit_gate.html
+│   │       ├── login.html
+│   │       └── open_shift.html
 │   ├── tests.py
 │   ├── urls.py
 │   └── views.py
@@ -281,13 +291,18 @@ root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "ven
 │   └── wsgi.py
 ├── manage.py
 ├── media
-│   └── entry_pics
+│   ├── entry_pics
+│   ├── exit_image
+│   └── exit_pics
 ├── parking
 │   ├── admin.py
 │   ├── apps.py
+│   ├── gate_serializers.py
+│   ├── gate_views.py
 │   ├── grid.py
 │   ├── migrations
 │   │   ├── 0001_initial.py
+│   │   ├── 0002_vehiclelog_collected_by_vehiclelog_entry_shift_and_more.py
 │   │   └── __init__.py
 │   ├── models.py
 │   ├── pathfinding.py
@@ -301,6 +316,5 @@ root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "ven
 ├── smart_parking_db_2026-05-14_212003.sql
 └── tracking_debug.log
 
-26 directories, 468 files
-root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# 
+21 directories, 70 files
 ```
