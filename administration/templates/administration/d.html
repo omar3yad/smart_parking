@@ -1,73 +1,292 @@
 {% extends "administration/base.html" %}
 {% block content %}
 <div class="row g-4 mb-4">
-  <div class="col-md-4"><div class="stat-box"><h2>{{ cars_inside_count }}</h2><p class="text-secondary mb-0">سيارات بالداخل الآن</p></div></div>
-  <div class="col-md-4"><div class="stat-box"><h2>{{ total_today }}</h2><p class="text-secondary mb-0">سيارات خرجت اليوم</p></div></div>
-  <div class="col-md-4"><div class="stat-box"><h2>#{{ active_shift.id }}</h2><p class="text-secondary mb-0">الشفت الحالي</p></div></div>
+  <div class="col-md-4">
+    <div class="stat-box">
+      <h2>{{ cars_inside_count }}</h2>
+      <p class="text-secondary mb-0">سيارات بالداخل الآن</p>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-box">
+      <h2>{{ total_today }}</h2>
+      <p class="text-secondary mb-0">سيارات خرجت اليوم</p>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-box">
+      <h2>#{{ active_shift.id }}</h2>
+      <p class="text-secondary mb-0">الشفت الحالي</p>
+    </div>
+  </div>
 </div>
 <div class="row g-4">
-  <div class="col-md-6"><div class="card-panel p-4">
-    <h5 class="fw-bold mb-3">بوابة الدخول</h5>
-    <p class="text-secondary">شاشة مباشرة لعرض السيارات الداخلة فور رصد الكاميرا لها.</p>
-    <a href="{% url 'entry-gate' %}" class="btn btn-accent">فتح بوابة الدخول</a>
-  </div></div>
-  <div class="col-md-6"><div class="card-panel p-4">
-    <h5 class="fw-bold mb-3">بوابة الخروج</h5>
-    <p class="text-secondary">عرض السيارات الخارجة وحساب المستحقات وتأكيد الدفع.</p>
-    <a href="{% url 'exit-gate' %}" class="btn btn-accent">فتح بوابة الخروج</a>
-  </div></div>
+  <div class="col-md-6">
+    <div class="card-panel p-4">
+      <h5 class="fw-bold mb-3">بوابة الدخول</h5>
+      <p class="text-secondary">شاشة مباشرة لعرض السيارات الداخلة فور رصد الكاميرا لها.</p>
+      <a href="{% url 'entry-gate' %}" class="btn btn-accent">فتح بوابة الدخول</a>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card-panel p-4">
+      <h5 class="fw-bold mb-3">بوابة الخروج</h5>
+      <p class="text-secondary">عرض السيارات الخارجة وحساب المستحقات وتأكيد الدفع.</p>
+      <a href="{% url 'exit-gate' %}" class="btn btn-accent">فتح بوابة الخروج</a>
+    </div>
+  </div>
 </div>
 <div class="card-panel p-4 mt-4">
-  <h5 class="fw-bold mb-3">إغلاق الشفت</h5>
+  <h5 class="fw-bold mb-3">📊 ملخص الشفت الحالي (حي)</h5>
+  <div id="shift-summary-box" class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="stat-box">
+        <h4 id="sum-starting">—</h4>
+        <p class="text-secondary mb-0">العهدة الافتتاحية</p>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-box">
+        <h4 id="sum-expected">—</h4>
+        <p class="text-secondary mb-0">المتوقع تحصيله</p>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-box">
+        <h4 id="sum-entered">—</h4>
+        <p class="text-secondary mb-0">سيارات دخلت</p>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-box">
+        <h4 id="sum-exited">—</h4>
+        <p class="text-secondary mb-0">سيارات خرجت</p>
+      </div>
+    </div>
+  </div>
+  <div id="unpaid-warning" class="alert alert-warning d-none"></div>
+  <hr>
+  <h5 class="fw-bold mb-3">🔒 إغلاق الشفت</h5>
   <div id="close-error" class="alert alert-danger d-none"></div>
-  <form id="close-shift-form" class="row g-3 align-items-end">
-    <div class="col-md-4"><label class="form-label">المبلغ الفعلي الموجود بالدرج</label>
-      <input type="number" step="0.01" id="actual_cash" class="form-control" required></div>
-    <div class="col-md-4"><button type="submit" class="btn btn-outline-danger">إغلاق الشفت</button></div>
-  </form>
-</div>
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label">المبلغ الفعلي الموجود بالدرج</label>
+      <input type="number" step="0.01" id="actual_cash" class="form-control" required>
+    </div>
+    <div class="col-md-4">
+      <button type="button" id="close-shift-btn" class="btn btn-outline-danger">إغلاق الشفت وعرض التقرير</button>
+    </div>
+  </div>
+
+  <div id="final-report" class="d-none mt-4">
+    <hr>
+    <h5 class="fw-bold mb-3">🧾 تقرير إغلاق الشفت #<span id="rep-shift-id"></span></h5>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="stat-box">
+          <h4 id="rep-starting">—</h4>
+          <p class="text-secondary mb-0">العهدة الافتتاحية</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-box">
+          <h4 id="rep-expected">—</h4>
+          <p class="text-secondary mb-0">المتوقع تحصيله</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-box">
+          <h4 id="rep-actual">—</h4>
+          <p class="text-secondary mb-0">المبلغ الفعلي المُسلَّم</p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-box" id="rep-diff-box">
+          <h4 id="rep-diff">—</h4>
+          <p class="text-secondary mb-0" id="rep-diff-label">الفرق</p>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-md-4">
+        <div class="stat-box">
+          <h4 id="rep-entered">—</h4>
+          <p class="text-secondary mb-0">سيارات دخلت</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-box">
+          <h4 id="rep-exited-paid">—</h4>
+          <p class="text-secondary mb-0">سيارات خرجت (مدفوعة)</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-box">
+          <h4 id="rep-exited-unpaid">—</h4>
+          <p class="text-secondary mb-0">سيارات خرجت (غير مدفوعة)</p>
+        </div>
+      </div>
+    </div>
+    <div id="rep-unpaid-warning" class="alert alert-warning mt-3 d-none"></div>
+
+    <h6 class="fw-bold mt-4 mb-2">تفاصيل السيارات الخارجة خلال الشفت</h6>
+    <div class="table-responsive">
+      <table class="table table-dark table-hover align-middle">
+        <thead>
+          <tr>
+            <th>اللوحة</th>
+            <th>وقت الدخول</th>
+            <th>وقت الخروج</th>
+            <th>المبلغ</th>
+            <th>الدفع</th>
+          </tr>
+        </thead>
+        <tbody id="rep-exits-body"></tbody>
+      </table>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button class="btn btn-accent" onclick="window.print()">🖨️ طباعة التقرير</button>
+      <a href="{% url 'open-shift-page' %}" class="btn btn-outline-light">فتح شفت جديد</a>
+    </div>
+  </div>
+</div> 
 <script>
-function getCookie(n){const v=`; ${document.cookie}`;const p=v.split(`; ${n}=`);if(p.length===2)return p.pop().split(';').shift();}
-document.getElementById('close-shift-form').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const cash = document.getElementById('actual_cash').value;
-  const err = document.getElementById('close-error'); err.classList.add('d-none');
-  const res = await fetch("{% url 'close-shift' %}", {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
-    body: JSON.stringify({actual_collected_cash: cash})
+  // let shiftSummaryInterval = setInterval(loadShiftSummary, 5000);
+  function getCookie(n) { const v = `; ${document.cookie}`; const p = v.split(`; ${n}=`); if (p.length === 2) return p.pop().split(';').shift(); }
+  function money(n) { return (n ?? 0).toFixed(2) + ' ج.م'; }
+
+  async function loadShiftSummary() {
+    try {
+      const res = await fetch("{% url 'shift-summary' %}");
+      if (!res.ok) return;
+      const d = await res.json();
+      document.getElementById('sum-starting').textContent = money(d.starting_cash);
+      document.getElementById('sum-expected').textContent = money(d.expected_collected_cash);
+      document.getElementById('sum-entered').textContent = d.cars_entered_count;
+      document.getElementById('sum-exited').textContent = d.cars_exited_count;
+      const warnBox = document.getElementById('unpaid-warning');
+      if (d.unpaid_warning) { warnBox.textContent = d.unpaid_warning; warnBox.classList.remove('d-none'); }
+      else { warnBox.classList.add('d-none'); }
+    } catch (err) { console.error(err); }
+  }
+  loadShiftSummary();
+  document.addEventListener('DOMContentLoaded', loadShiftSummary);
+
+  document.getElementById('close-shift-btn').addEventListener('click', async () => {
+    const cash = document.getElementById('actual_cash').value;
+    const err = document.getElementById('close-error');
+    err.classList.add('d-none');
+
+    if (!cash || parseFloat(cash) < 0) {
+      err.textContent = 'من فضلك أدخل مبلغًا صحيحًا.';
+      err.classList.remove('d-none');
+      return;
+    }
+
+    if (!confirm('هل أنت متأكد من إغلاق الشفت؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+
+    const res = await fetch("{% url 'close-shift' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify({ actual_collected_cash: cash })
+    });
+    const d = await res.json();
+    if (!res.ok) { err.textContent = JSON.stringify(d); err.classList.remove('d-none'); return; }
+
+    // إخفاء زرار الإغلاق والـ input بعد النجاح، وعرض التقرير
+    document.getElementById('close-shift-btn').disabled = true;
+    document.getElementById('actual_cash').disabled = true;
+
+    document.getElementById('rep-shift-id').textContent = d.shift_id;
+    document.getElementById('rep-starting').textContent = money(d.starting_cash);
+    document.getElementById('rep-expected').textContent = money(d.expected_collected_cash);
+    document.getElementById('rep-actual').textContent = money(d.actual_collected_cash);
+
+    const diffEl = document.getElementById('rep-diff');
+    const diffBox = document.getElementById('rep-diff-box');
+    const diffLabel = document.getElementById('rep-diff-label');
+    diffEl.textContent = money(Math.abs(d.difference));
+    diffLabel.textContent = d.difference_status;
+    diffBox.style.background = d.difference_status === 'عجز' ? '#7f1d1d' : d.difference_status === 'زيادة' ? '#14532d' : '#1e293b';
+
+    document.getElementById('rep-entered').textContent = d.cars_entered_count;
+    document.getElementById('rep-exited-paid').textContent = d.cars_exited_paid_count;
+    document.getElementById('rep-exited-unpaid').textContent = d.cars_exited_unpaid_count;
+
+    const unpaidWarn = document.getElementById('rep-unpaid-warning');
+    if (d.unpaid_warning) { unpaidWarn.textContent = d.unpaid_warning; unpaidWarn.classList.remove('d-none'); }
+
+    const tbody = document.getElementById('rep-exits-body');
+    tbody.innerHTML = '';
+    d.exits_detail.forEach(row => {
+      tbody.innerHTML += `
+      <tr>
+        <td class="fw-bold">${row.license_plate}</td>
+        <td>${new Date(row.entry_time).toLocaleString('ar-EG')}</td>
+        <td>${new Date(row.exit_time).toLocaleString('ar-EG')}</td>
+        <td>${money(row.total_fee)}</td>
+        <td>${row.is_paid ? '<span class="badge bg-success">مدفوع</span>' : '<span class="badge bg-danger">غير مدفوع</span>'}</td>
+      </tr>`;
+    });
+
+    document.getElementById('final-report').classList.remove('d-none');
+    document.getElementById('final-report').scrollIntoView({ behavior: 'smooth' });
+
+    // أوقف الـ polling الخاص بملخص الشفت الحي لأن الشفت بقى مقفول
+    // clearInterval(shiftSummaryInterval);
   });
-  if(res.ok){ window.location.href = "{% url 'open-shift-page' %}"; }
-  else{ const d = await res.json(); err.textContent = JSON.stringify(d); err.classList.remove('d-none'); }
-});
+</script>
+<script>
+  function getCookie(n) { const v = `; ${document.cookie}`; const p = v.split(`; ${n}=`); if (p.length === 2) return p.pop().split(';').shift(); }
+  document.getElementById('close-shift-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cash = document.getElementById('actual_cash').value;
+    const err = document.getElementById('close-error'); err.classList.add('d-none');
+    const res = await fetch("{% url 'close-shift' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify({ actual_collected_cash: cash })
+    });
+    if (res.ok) { window.location.href = "{% url 'open-shift-page' %}"; }
+    else { const d = await res.json(); err.textContent = JSON.stringify(d); err.classList.remove('d-none'); }
+  });
 </script>
 <div class="card-panel p-4 mt-4">
   <h5 class="fw-bold mb-3">🧾 سجل العمليات (دخول وخروج)</h5>
   <div class="table-responsive">
     <table class="table table-dark table-hover align-middle">
       <thead>
-        <tr><th>النوع</th><th>اللوحة</th><th>الوقت</th><th>المبلغ</th><th>حالة الدفع</th></tr>
+        <tr>
+          <th>النوع</th>
+          <th>اللوحة</th>
+          <th>الوقت</th>
+          <th>المبلغ</th>
+          <th>حالة الدفع</th>
+        </tr>
       </thead>
       <tbody id="ops-table-body"></tbody>
     </table>
   </div>
-  <nav><ul class="pagination justify-content-center" id="ops-pagination"></ul></nav>
+  <nav>
+    <ul class="pagination justify-content-center" id="ops-pagination"></ul>
+  </nav>
 </div>
 
 <script>
-async function loadOperationsLog(page=1){
-  const res = await fetch(`{% url 'operations-log' %}?page=${page}`);
-  const data = await res.json();
-  const tbody = document.getElementById('ops-table-body');
-  tbody.innerHTML = '';
-  data.results.forEach(row => {
-    const badge = row.event_type === 'دخول'
-      ? '<span class="badge bg-primary">دخول</span>'
-      : '<span class="badge bg-warning text-dark">خروج</span>';
-    const paidBadge = row.event_type === 'خروج'
-      ? (row.is_paid ? '<span class="badge bg-success">مدفوع</span>' : '<span class="badge bg-danger">غير مدفوع</span>')
-      : '—';
-    tbody.innerHTML += `
+  async function loadOperationsLog(page = 1) {
+    const res = await fetch(`{% url 'operations-log' %}?page=${page}`);
+    const data = await res.json();
+    const tbody = document.getElementById('ops-table-body');
+    tbody.innerHTML = '';
+    data.results.forEach(row => {
+      const badge = row.event_type === 'دخول'
+        ? '<span class="badge bg-primary">دخول</span>'
+        : '<span class="badge bg-warning text-dark">خروج</span>';
+      const paidBadge = row.event_type === 'خروج'
+        ? (row.is_paid ? '<span class="badge bg-success">مدفوع</span>' : '<span class="badge bg-danger">غير مدفوع</span>')
+        : '—';
+      tbody.innerHTML += `
       <tr>
         <td>${badge}</td>
         <td class="fw-bold">${row.license_plate}</td>
@@ -75,30 +294,30 @@ async function loadOperationsLog(page=1){
         <td>${row.event_type === 'خروج' ? row.total_fee + ' ج.م' : '—'}</td>
         <td>${paidBadge}</td>
       </tr>`;
-  });
-  renderOpsPagination(data.count, page, 10);
-}
+    });
+    renderOpsPagination(data.count, page, 10);
+  }
 
-function renderOpsPagination(totalCount, currentPage, pageSize){
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const el = document.getElementById('ops-pagination');
-  el.innerHTML = '';
-  const addPage = (label, page, disabled=false, active=false) => {
-    const li = document.createElement('li');
-    li.className = `page-item ${disabled?'disabled':''} ${active?'active':''}`;
-    const a = document.createElement('a');
-    a.className = 'page-link'; a.href = '#'; a.textContent = label;
-    a.style.cursor = 'pointer';
-    if(!disabled && !active) a.onclick = (e)=>{ e.preventDefault(); loadOperationsLog(page); };
-    li.appendChild(a); el.appendChild(li);
-  };
-  addPage('السابق', currentPage-1, currentPage<=1);
-  const start = Math.max(1, currentPage-2);
-  const end = Math.min(totalPages, currentPage+2);
-  for(let p=start; p<=end; p++) addPage(p, p, false, p===currentPage);
-  addPage('التالي', currentPage+1, currentPage>=totalPages);
-}
+  function renderOpsPagination(totalCount, currentPage, pageSize) {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const el = document.getElementById('ops-pagination');
+    el.innerHTML = '';
+    const addPage = (label, page, disabled = false, active = false) => {
+      const li = document.createElement('li');
+      li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+      const a = document.createElement('a');
+      a.className = 'page-link'; a.href = '#'; a.textContent = label;
+      a.style.cursor = 'pointer';
+      if (!disabled && !active) a.onclick = (e) => { e.preventDefault(); loadOperationsLog(page); };
+      li.appendChild(a); el.appendChild(li);
+    };
+    addPage('السابق', currentPage - 1, currentPage <= 1);
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+    for (let p = start; p <= end; p++) addPage(p, p, false, p === currentPage);
+    addPage('التالي', currentPage + 1, currentPage >= totalPages);
+  }
 
-loadOperationsLog();
+  loadOperationsLog();
 </script>
 {% endblock %}

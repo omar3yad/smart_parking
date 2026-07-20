@@ -3,6 +3,7 @@ from django.urls import path
 from .views import RegisterView, UserProfileView, CheckAuthView
 from .views import OpenShiftView, CloseShiftView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .views import ShiftSummaryView
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='auth_register'),
@@ -12,4 +13,6 @@ urlpatterns = [
     path('check/', CheckAuthView.as_view(), name='check_auth'),
     path('shift/close/', CloseShiftView.as_view(), name='close-shift'),
     path('shift/open/', OpenShiftView.as_view(), name='open-shift'),
+        path('shift/summary/', ShiftSummaryView.as_view(), name='shift-summary'),
+
 ]
