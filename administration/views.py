@@ -1,18 +1,20 @@
-from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView
-from rest_framework.response import Response
+# /root/Smart-Parking-System/smart-parking-system-main/administration/views.py
+from decimal import Decimal
+from datetime import timedelta
+from django.utils import timezone
+from accounts.models import Shift
 from rest_framework import status
+from rest_framework.views import APIView
 from django.contrib.auth.models import User
 from django.db.models import Sum, Count, Avg
-from django.db.models.functions import TruncDay, TruncMonth, TruncHour
-from django.utils import timezone
-from datetime import timedelta
-from decimal import Decimal
-from django.views.decorators.csrf import ensure_csrf_cookie
-from django.shortcuts import render
+from rest_framework.response import Response
+from django.shortcuts import render, redirect
+from rest_framework.generics import ListAPIView
+from .permissions import IsAdminUser, IsSuperAdmin
 from django.contrib.auth.decorators import login_required
-
+from django.views.decorators.csrf import ensure_csrf_cookie
 from parking.models import ParkingSlot, VehicleLog, Reservation
+from django.db.models.functions import TruncDay, TruncMonth, TruncHour
 from .serializers import (
     AdminVehicleLogSerializer,
     AdminSlotSerializer,
@@ -20,7 +22,6 @@ from .serializers import (
     CreateAdminSerializer,
     AdminReservationSerializer,
 )
-from .permissions import IsAdminUser, IsSuperAdmin
 
 
 # ─────────────────────────────────────────────
@@ -400,3 +401,68 @@ def admin_dashboard_view(request):
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Admins only.")
     return render(request, 'administration/dashboard.html')
+
+@login_required
+def operator_dashboard(request):
+    active_shift = Shift.objects.filter(employee=request.user, is_closed=False).first()
+    if not active_shift:
+        return redirect('open-shift-page')
+
+    cars_inside_count = VehicleLog.objects.filter(is_inside=True).count()
+    total_today = VehicleLog.objects.filter(is_inside=False, status='exited').count()
+
+    context = {
+        'active_shift': active_shift,
+        'cars_inside_count': cars_inside_count,
+        'total_today': total_today,
+    }
+    return render(request, 'administration/d.html', context)
+
+
+@login_required
+@ensure_csrf_cookie
+def entry_gate_view(request):
+    return render(request, 'administration/entry_gate.html')
+
+
+@login_required
+@ensure_csrf_cookie
+def exit_gate_view(request):
+    return render(request, 'administration/exit_gate.html')
+
+
+# ضيف الاستيرادات دي فوق (لو ناقصة)
+from rest_framework import permissions
+from rest_framework.pagination import PageNumberPagination
+from django.db.models import F, Value, CharField
+
+
+class OperationsPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
+
+class OperationsLogAPIView(APIView):
+    """
+    سجل موحّد لكل عمليات الدخول والخروج (Timeline)، مرتب من الأحدث للأقدم.
+    متاح لأي موظف مسجّل دخول (مش أدمن فقط) لأنه بيظهر في داشبورد المشغّل.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        entries = VehicleLog.objects.annotate(
+            event_time=F('entry_time'),
+            event_type=Value('دخول', output_field=CharField())
+        ).values('id', 'license_plate', 'car_color', 'event_time', 'event_type', 'total_fee', 'is_paid')
+
+        exits = VehicleLog.objects.filter(exit_time__isnull=False).annotate(
+            event_time=F('exit_time'),
+            event_type=Value('خروج', output_field=CharField())
+        ).values('id', 'license_plate', 'car_color', 'event_time', 'event_type', 'total_fee', 'is_paid')
+
+        combined = entries.union(exits).order_by('-event_time')
+
+        paginator = OperationsPagination()
+        page = paginator.paginate_queryset(combined, request)
+        return paginator.get_paginated_response(list(page))

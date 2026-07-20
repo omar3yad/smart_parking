@@ -24,5 +24,5 @@ urlpatterns = [
     path('', include('parking.urls')), 
     path('api/auth/', include('accounts.urls')),
     path('api/admin/', include('administration.urls')), 
-
+    path('accounts/', include('accounts.web_urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

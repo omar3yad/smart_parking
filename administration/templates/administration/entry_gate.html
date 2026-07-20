@@ -1,0 +1,88 @@
+{% extends "administration/base.html" %}
+{% block content %}
+<h3 class="fw-bold mb-4">🟢 بوابة الدخول - مباشر</h3>
+<div id="entry-card" class="card-panel p-4 text-center d-none" style="max-width:600px;margin:auto;">
+  <img id="entry-img" src="" class="img-fluid rounded mb-3" style="max-height:320px;object-fit:cover;">
+  <h1 id="entry-plate" class="fw-bold" style="letter-spacing:2px;"></h1>
+  <p class="text-secondary" id="entry-time"></p>
+  <p id="entry-color"></p>
+</div>
+<div id="entry-empty" class="text-center text-secondary mt-5"><h4>في انتظار دخول سيارة جديدة...</h4></div>
+<script>
+let lastShownId = null;
+async function pollEntries(){
+  try{
+    const res = await fetch("{% url 'gate-recent-entries' %}");
+    const data = await res.json();
+    if(data.length && data[0].id !== lastShownId){
+      lastShownId = data[0].id;
+      const e = data[0];
+      document.getElementById('entry-empty').classList.add('d-none');
+      document.getElementById('entry-card').classList.remove('d-none');
+      document.getElementById('entry-img').src = e.entry_image_url || '';
+      document.getElementById('entry-plate').textContent = e.license_plate;
+      document.getElementById('entry-time').textContent = 'وقت الدخول: ' + new Date(e.entry_time).toLocaleTimeString('ar-EG');
+    }
+  } catch(err){ console.error(err); }
+}
+pollEntries(); setInterval(pollEntries, 3000);
+</script>
+<hr class="my-5">
+<div class="card-panel p-4">
+  <h5 class="fw-bold mb-3">📋 سجل كل السيارات الداخلة</h5>
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle">
+      <thead>
+        <tr>
+          <th>#</th><th>اللوحة</th><th>وقت الدخول</th><th>الصورة</th>
+        </tr>
+      </thead>
+      <tbody id="entries-table-body"></tbody>
+    </table>
+  </div>
+  <nav><ul class="pagination justify-content-center" id="entries-pagination"></ul></nav>
+</div>
+
+<script>
+const STATUS_LABELS = {moving:'متحركة', parked:'متوقفة', exited:'خرجت'};
+
+async function loadEntriesHistory(page=1){
+  const res = await fetch(`{% url 'gate-entries-history' %}?page=${page}`);
+  const data = await res.json();
+  const tbody = document.getElementById('entries-table-body');
+  tbody.innerHTML = '';
+  data.results.forEach(row => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${row.id}</td>
+        <td class="fw-bold">${row.license_plate}</td>
+        <td>${new Date(row.entry_time).toLocaleString('ar-EG')}</td>
+        <td>${row.entry_image_url ? `<a href="${row.entry_image_url}" target="_blank">عرض</a>` : '—'}</td>
+      </tr>`;
+  });
+  renderPagination('entries-pagination', data.count, page, 10, loadEntriesHistory);
+}
+
+function renderPagination(containerId, totalCount, currentPage, pageSize, onPageClick){
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  const addPage = (label, page, disabled=false, active=false) => {
+    const li = document.createElement('li');
+    li.className = `page-item ${disabled?'disabled':''} ${active?'active':''}`;
+    const a = document.createElement('a');
+    a.className = 'page-link'; a.href = '#'; a.textContent = label;
+    a.style.cursor = 'pointer';
+    if(!disabled && !active) a.onclick = (e)=>{ e.preventDefault(); onPageClick(page); };
+    li.appendChild(a); el.appendChild(li);
+  };
+  addPage('السابق', currentPage-1, currentPage<=1);
+  const start = Math.max(1, currentPage-2);
+  const end = Math.min(totalPages, currentPage+2);
+  for(let p=start; p<=end; p++) addPage(p, p, false, p===currentPage);
+  addPage('التالي', currentPage+1, currentPage>=totalPages);
+}
+
+loadEntriesHistory();
+</script>
+{% endblock %}

@@ -17,10 +17,15 @@ class VehicleEntrySerializer(serializers.ModelSerializer):
         # تنظيف رقم اللوحة: حروف كبيرة وبدون مسافات
         return value.strip().upper().replace(" ", "")
 
-class VehicleExitSerializer(serializers.Serializer):
-    license_plate = serializers.CharField(max_length=20)
-    exit_image = serializers.ImageField()
-
+# class VehicleExitSerializer(serializers.Serializer):
+#     license_plate = serializers.CharField(max_length=20)
+#     exit_image = serializers.ImageField()
+class VehicleExitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VehicleLog
+        fields = ['id', 'license_plate', 'entry_time', 'exit_time', 'total_fee', 'is_paid']
+        read_only_fields = ['id', 'entry_time', 'exit_time', 'total_fee']
+        
 class SlotStatusUpdateSerializer(serializers.Serializer):
     # قائمة من أرقام الـ slots وحالتها الجديدة
     slot_id = serializers.CharField() 

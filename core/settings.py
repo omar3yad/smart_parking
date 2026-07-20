@@ -1,3 +1,4 @@
+# /root/Smart-Parking-System/smart-parking-system-main/core/settings.py
 from pathlib import Path
 import os
 from dotenv import load_dotenv
@@ -13,7 +14,9 @@ load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-secret-key')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 CAMERA_SECRET_KEY = os.getenv('CAMERA_SECRET_KEY')
-
+LOGIN_URL = 'employee-login'
+LOGIN_REDIRECT_URL = 'post-login-redirect'
+LOGOUT_REDIRECT_URL = 'employee-login'
 # ALLOWED_HOSTS = []
 ALLOWED_HOSTS = ['*']  # للسماح بكل النطاقات (غير آمن للإنتاج، استخدمه فقط للتطوير) 
 

@@ -9,9 +9,11 @@ from .views import ParkingSlotListAPIView
 from .views import ExtendReservationAPIView
 from .views import CancelReservationAPIView
 from .views import CreateReservationAPIView
+from .views import MyReservationsListAPIView
 from .views import UserCurrentLocationAPIView
 from .views import UpdateEntryEmbeddingAPIView
-from .views import MyReservationsListAPIView
+from .gate_views import EntriesHistoryAPIView, ExitsHistoryAPIView
+from .gate_views import RecentEntriesAPIView, PendingExitAPIView, ConfirmExitPaymentAPIView
 
 urlpatterns = [
 
@@ -33,4 +35,10 @@ urlpatterns = [
     path('api/reservations/<int:reservation_id>/extend/', ExtendReservationAPIView.as_view(), name='extend-reservation'),
     path('api/my-reservations/', MyReservationsListAPIView.as_view(), name='my-reservations'),
     
+    path('gate/entries/recent/', RecentEntriesAPIView.as_view(), name='gate-recent-entries'),
+    path('gate/exit/pending/', PendingExitAPIView.as_view(), name='gate-pending-exit'),
+    path('gate/exit/<int:pk>/confirm-payment/', ConfirmExitPaymentAPIView.as_view(), name='gate-confirm-payment'),
+    path('gate/entries/history/', EntriesHistoryAPIView.as_view(), name='gate-entries-history'),
+    path('gate/exits/history/', ExitsHistoryAPIView.as_view(), name='gate-exits-history'),
+
 ]

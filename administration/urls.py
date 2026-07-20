@@ -1,3 +1,4 @@
+# /root/Smart-Parking-System/smart-parking-system-main/administration/urls.py
 from django.urls import path
 from .views import (
     AdminGarageStatsAPIView,
@@ -10,6 +11,9 @@ from .views import (
     AdminReservationListAPIView,
     admin_dashboard_view,
 )
+from .views import operator_dashboard
+from .views import entry_gate_view, exit_gate_view
+from .views import OperationsLogAPIView
 
 urlpatterns = [
     path('', admin_dashboard_view,),
@@ -21,4 +25,12 @@ urlpatterns = [
     path('users/', AdminUserListAPIView.as_view(), name='admin-users'),
     path('users/create-admin/', CreateAdminUserAPIView.as_view(), name='admin-create-admin'),
     path('reservations/', AdminReservationListAPIView.as_view(), name='admin-reservations'),
+    path('dashboard/', operator_dashboard, name='operator-dashboard'),
+    path('gate/exit/', exit_gate_view, name='exit-gate'),
+    path('gate/entry/', entry_gate_view, name='entry-gate'),
+    path('operations/', OperationsLogAPIView.as_view(), name='operations-log'),
+
+]
+
+urlpatterns += [
 ]

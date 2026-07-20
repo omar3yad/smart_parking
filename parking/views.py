@@ -1,4 +1,6 @@
+# /root/Smart-Parking-System/smart-parking-system-main/parking/views.py
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser # 👈 استيراد البارسرز المهمة للملفات
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,6 +20,7 @@ from .models import ParkingSlot, VehicleLog, Reservation,Camera
 from .pathfinding import astar, get_road_cell_next_to_slot
 from .permissions import IsCameraNode, IsOwnerOrAdmin
 from .grid import GARAGE_GRID, SLOT_COORDINATES
+from accounts.models import Shift
 
 import numpy as np
 import logging
@@ -40,6 +43,7 @@ SIMILAR_COLORS = {
     'green':  ['green'],
 }
 
+
 class VehicleEntryAPIView(APIView):
     permission_classes = [IsCameraNode]
     
@@ -51,121 +55,94 @@ class VehicleEntryAPIView(APIView):
             plate = v_data['license_plate']
             
             # --- 1. التحقق من الدخول المزدوج (Double Entry Check) ---
-            # إذا كانت السيارة مسجلة أنها بالداخل بالفعل، نحدث بياناتها ولا ننشئ سجلاً جديداً
             existing_log = VehicleLog.objects.filter(license_plate=plate, is_inside=True).first()
             if existing_log:
                 return Response({
                     "status": "warning",
                     "message": "السيارة مسجلة بالداخل بالفعل (دخول مزدوج)",
                     "log_id": existing_log.id
-                }, status=200)
+                }, status=status.HTTP_200_OK)
 
-            # --- 2. البحث عن حجز نشط (Reservation Check) ---
-            now = timezone.now()
-            reservation = Reservation.objects.filter(
+            # --- 2. جلب الشفت النشط (Active Shift) ---
+            # بما أن الكاميرا هي من ترسل الـ API، سنجلب الشفت المفتوح حالياً لربطه بالدخول
+            active_shift = Shift.objects.filter(is_closed=False).first()
+
+            # --- 3. حفظ سجل الدخول (بدون Slots أو Reservations) ---
+            vehicle_log = VehicleLog.objects.create(
                 license_plate=plate,
-                is_active=True,
-                start_time__lte=now,
-                end_time__gte=now
-            ).select_related('slot').first()
-
-            target_slot = None
-            
-            # استخدام Atomic Transaction لضمان سلامة البيانات عند تغيير حالة الـ Slot
-            with transaction.atomic():
-                if reservation:
-                    target_slot = reservation.slot
-                    identified_user = reservation.user.username
-                else:
-                    # --- 3. التعامل مع الزوار (Guest Allocation) ---
-                    # اختيار أول مكان متاح (Available) وتخصيصه فوراً
-                    target_slot = ParkingSlot.objects.filter(status='available').first()
-                    identified_user = "Guest"
-
-                # 4. تحديث حالة المكان المحجوز/المخصص
-                if target_slot:
-                    target_slot.status = 'available' # أو reserved مؤقتاً
-                    target_slot.save()
-
-                # 5. حفظ سجل الدخول
-                vehicle_log = VehicleLog.objects.create(
-                    license_plate=plate,
-                    entry_image=v_data.get('entry_image'),
-                    car_embedding=v_data.get('car_embedding'),
-                    car_color=v_data.get('car_color', 'unknown'),
-                    is_inside=True,
-                    slot=target_slot,
-                    last_camera_id=1
-                )
+                entry_image=v_data.get('entry_image'),
+                car_embedding=v_data.get('car_embedding'),
+                car_color=v_data.get('car_color', 'unknown'),
+                is_inside=True,
+                status='parked',  # أو moving حسب دورتك
+                entry_shift=active_shift  # ربط العربية بالشفت اللي دخلت فيه
+            )
 
             return Response({
                 "status": "success",
                 "log_id": vehicle_log.id,
-                "identified_user": identified_user,
-                "target_slot": target_slot.slot_number if target_slot else "No Slots Available",
-                "message": "تم تسجيل الدخول وتخصيص مكان"
-            }, status=201)
+                "message": "تم تسجيل الدخول بنجاح"
+            }, status=status.HTTP_201_CREATED)
             
-        return Response(serializer.errors, status=400)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 class VehicleExitAPIView(APIView):
     """
-    إغلاق سجل السيارة وحساب التكلفة عند بوابة الخروج.
-    ملاحظة: الماشين هي المسؤولة عن تحديث حالة الـ Slot إلى available 
-    عبر BulkSlotUpdateAPIView، لذا لن نقوم بتغيير حالة السلوت هنا يدوياً.
+    إغلاق سجل السيارة وحساب التكلفة عند بوابة الخروج بناءً على التسعيرة الجديدة.
     """
     permission_classes = [IsCameraNode]
+    parser_classes = [MultiPartParser, FormParser] # 👈 السطر ده هو اللي هيخلي الـ API يشوف الصورة المرفوعة
 
     def post(self, request):
         serializer = VehicleExitSerializer(data=request.data)
         if serializer.is_valid():
             plate = serializer.validated_data['license_plate']
-            image = serializer.validated_data.get('exit_image')
+            # هيحاول يجيبها من السيريالايزر، لو ملهاش وجود هيجيبها من ملفات الـ Request المرفوعة مباشرة
+            image = serializer.validated_data.get('exit_image') or request.FILES.get('exit_image')
 
-            # البحث عن آخر سجل دخول للسيارة لم يغلق بعد
-            # الفلتر بـ is_inside=True يضمن أننا نتعامل مع سيارة موجودة فعلياً
+            # --- 1. البحث عن سجل السيارة النشط بالداخل ---
             log = VehicleLog.objects.filter(
                 license_plate=plate, 
                 is_inside=True
-            ).select_related('slot').last()
+            ).last()
 
             if not log:
                 return Response({
-                    "error": "Vehicle not found in garage or already exited"
+                    "error": "لم يتم العثور على سيارة داخل الجراج بهذه اللوحة"
                 }, status=status.HTTP_404_NOT_FOUND)
 
             with transaction.atomic():
-                now = timezone.now()
-                log.exit_time = now
-                log.exit_image = image
-                log.is_inside = False  # إخراج السيارة من نظام التتبع فوراً
+                # --- 2. حساب السعر أولاً وتحديث التوقيت ---
+                log.calculate_parking_fee() 
                 
-                # حساب الساعات بطريقة احترافية (أي جزء من الساعة = ساعة كاملة)
-                duration = now - log.entry_time
-                hours = math.ceil(duration.total_seconds() / 3600)
-                if hours < 1: hours = 1
+                # --- 3. تسجيل بيانات الخروج والصورة وتغيير الحالة ---
+                if image:
+                    log.exit_image = image # 👈 حفظ الصورة بعد التأكد من وصولها
                 
-                # حساب التكلفة (25 جنيهاً للساعة)
-                log.total_fee = Decimal(hours) * Decimal(25.00)
-                log.is_paid = True 
-                log.save()
+                log.is_inside = False 
+                log.status = 'exited'
+                
+                # --- 4. ربط عملية الخروج بالشفت المفتوح والموظف ---
+                active_shift = Shift.objects.filter(is_closed=False).first()
+                if active_shift:
+                    log.exit_shift = active_shift
+                    if request.user and request.user.is_authenticated:
+                        log.collected_by = request.user
 
-                # --- خطوة إضافية احترافية ---
-                # إنهاء أي حجز نشط لهذه اللوحة لضمان نظافة البيانات
-                Reservation.objects.filter(
-                    license_plate=plate, 
-                    is_active=True
-                ).update(is_active=False)
+                # حفظ كل التعديلات نهائياً في قاعدة البيانات
+                log.save()
 
             return Response({
                 "status": "success",
-                "message": "Vehicle exit recorded successfully",
+                "message": "تم تسجيل الخروج بنجاح",
                 "summary": {
                     "plate": plate,
                     "entry_time": log.entry_time.strftime('%Y-%m-%d %H:%M'),
                     "exit_time": log.exit_time.strftime('%Y-%m-%d %H:%M'),
-                    "duration_hours": hours,
-                    "total_fee": float(log.total_fee)
+                    "total_fee": float(log.total_fee),
+                    "shift_id": active_shift.id if active_shift else None
                 }
             }, status=status.HTTP_200_OK)
 
@@ -174,7 +151,7 @@ class VehicleExitAPIView(APIView):
 class BulkSlotUpdateAPIView(APIView):
     """
     تحديث جماعي لحالة الركنات من كاميرات الماشين ليرنينج.
-    تطبق منطق الربط الذكي: الكاميرا تكسر الحجز لو وجدت سيارة، 
+    تطبق منطق الربط الذكي: الكاميرا تكسر الحجز لو وجدت سيارة， 
     وتحترم الحجز لو الركنة فارغة.
     """
     permission_classes = [IsCameraNode]

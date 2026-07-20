@@ -1,4 +1,7 @@
+# /root/Smart-Parking-System/smart-parking-system-main/parking/models.py
+import math
 from django.db import models
+from django.utils import timezone
 from pgvector.django import VectorField
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.auth.models import User
@@ -90,6 +93,10 @@ class VehicleLog(models.Model):
     status = models.CharField(max_length=10, choices=VEHICLE_STATUS, default='moving')
     last_seen = models.DateTimeField(auto_now=True)
 
+    entry_shift = models.ForeignKey('accounts.Shift', on_delete=models.SET_NULL, null=True, blank=True, related_name='entries_recorded')
+    exit_shift = models.ForeignKey('accounts.Shift', on_delete=models.SET_NULL, null=True, blank=True, related_name='exits_recorded')
+    collected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='payments_collected')
+    
     class Meta:
         indexes = [
             # إنشاء فحص (Index) لنوع البحث عن المتجهات (HNSW أو IVFFLAT) لتحقيق سرعة خارقة
@@ -97,6 +104,40 @@ class VehicleLog(models.Model):
         ]
     def __str__(self):
         return f"{self.license_plate} - {self.entry_time.strftime('%Y-%m-%d %H:%M')}"
+    def calculate_parking_fee(self):
+        if not self.exit_time:
+            self.exit_time = timezone.now()
+            
+        duration = self.exit_time - self.entry_time
+        total_minutes = duration.total_seconds() / 60
+        
+        # 1. حساب الساعات الكاملة والدقائق المتبقية
+        hours = int(total_minutes // 60)
+        remaining_minutes = total_minutes % 60
+        
+        # 2. تطبيق قاعدة الـ 7 دقائق سماح على الدقائق المتبقية
+        if remaining_minutes > 7:
+            billable_hours = hours + 1
+        else:
+            billable_hours = hours
+            
+        # إذا كانت المدة الإجمالية أقل من أو تساوي 7 دقائق من البداية (دخل وخرج فوراً)
+        if billable_hours == 0 and total_minutes <= 7:
+            self.total_fee = 0.00
+            return self.total_fee
+
+        # لضمان حساب أول ساعة على الأقل إذا تجاوز الـ 7 دقائق الإجمالية
+        if billable_hours == 0:
+            billable_hours = 1
+
+        # 3. حساب السعر (أول ساعة 35، وما بعدها 30)
+        if billable_hours == 1:
+            fee = 35.00
+        else:
+            fee = 35.00 + (billable_hours - 1) * 30.00
+            
+        self.total_fee = fee
+        return self.total_fee
 
 class Reservation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

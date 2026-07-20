@@ -238,3 +238,68 @@ JSON
     "last_seen": "17:01:11"
 }
 ```
+
+root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# tree . -I "venv|.venv|__pycache__|lib|lib64|include|share"
+.
+├── README.md
+├── accounts
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── migrations
+│   │   └── __init__.py
+│   ├── models.py
+│   ├── serializers.py
+│   ├── tests.py
+│   ├── urls.py
+│   └── views.py
+├── administration
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── migrations
+│   │   └── __init__.py
+│   ├── models.py
+│   ├── permissions.py
+│   ├── serializers.py
+│   ├── templates
+│   │   └── administration
+│   │       └── dashboard.html
+│   ├── tests.py
+│   ├── urls.py
+│   └── views.py
+├── camera test
+│   ├── camera_test.py
+│   ├── car.jpg
+│   ├── car_exit.jpg
+│   └── tracking_test.py
+├── core
+│   ├── __init__.py
+│   ├── asgi.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+├── manage.py
+├── media
+│   └── entry_pics
+├── parking
+│   ├── admin.py
+│   ├── apps.py
+│   ├── grid.py
+│   ├── migrations
+│   │   ├── 0001_initial.py
+│   │   └── __init__.py
+│   ├── models.py
+│   ├── pathfinding.py
+│   ├── permissions.py
+│   ├── populate_slots.sql
+│   ├── serializers.py
+│   ├── test.html
+│   ├── urls.py
+│   └── views.py
+├── requirements.txt
+├── smart_parking_db_2026-05-14_212003.sql
+└── tracking_debug.log
+
+26 directories, 468 files
+root@srv1203153:~/Smart-Parking-System/smart-parking-system-main# 

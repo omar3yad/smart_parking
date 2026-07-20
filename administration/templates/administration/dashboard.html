@@ -8,6 +8,25 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
  
+      #slot-map {
+    display: grid;
+    /* ده هيخلي الجريد 4 أعمدة متساوية */
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 10px; /* المسافة بين الـ slots */
+    padding: 10px;
+}
+
+.slot {
+    /* تنسيق الـ slot نفسه (مربع مثلاً) */
+    /* aspect-ratio: 1 / 1; */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 14px;
+}
     :root {
       --sidebar-w: 230px;
       --topbar-h: 64px;
@@ -641,15 +660,35 @@ async function loadDashboard() {
   }
 
   // Load slot map
+// Load slot map
   try {
     const r = await apiFetch('/slots/');
-    const slots = await r.json();
+    let slots = await r.json();
     const sm = document.getElementById('slot-map');
     sm.innerHTML = '';
+
+    // ترتيب السلوتس بحيث يمشوا A1, B1, C1, D1 ثم A2, B2...
+    // المنطق: بنرتب حسب الرقم الأول، ولو الأرقام متساوية بنرتب حسب الحرف
+    slots.sort((a, b) => {
+        const numA = parseInt(a.slot_number.substring(1));
+        const numB = parseInt(b.slot_number.substring(1));
+        const charA = a.slot_number.charAt(0);
+        const charB = b.slot_number.charAt(0);
+
+        if (numA !== numB) {
+            return numA - numB; // رتب بالأرقام (1 ثم 2 ثم 3)
+        }
+        return charA.localeCompare(charB); // لو نفس الرقم، رتب بالحروف (A ثم B)
+    });
+
     slots.forEach(sl => {
       const d = document.createElement('div');
       d.className = 'slot ' + sl.status;
-      d.innerHTML = `<span class="slot-num">${sl.slot_number}</span>${sl.status.charAt(0).toUpperCase()}`;
+      // التنسيق اللي أنت طلبته
+      d.innerHTML = `
+        <span class="slot-num">${sl.slot_number}</span>
+        <small>${sl.status.toUpperCase()}</small>
+      `;
       d.title = `${sl.slot_number} — ${sl.status}`;
       sm.appendChild(d);
     });

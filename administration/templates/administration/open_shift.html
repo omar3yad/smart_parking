@@ -1,0 +1,29 @@
+{% extends "administration/base.html" %}
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height:80vh;">
+  <div class="card-panel p-5" style="width:100%;max-width:420px;">
+    <h3 class="text-center mb-2 fw-bold">فتح شفت جديد</h3>
+    <p class="text-center text-secondary mb-4">أدخل العهدة النقدية الموجودة في الدرج الآن</p>
+    <div id="error-box" class="alert alert-danger d-none"></div>
+    <form id="open-shift-form">
+      <div class="mb-3"><label class="form-label">{{ form.starting_cash.label }}</label>{{ form.starting_cash }}</div>
+      <button type="submit" class="btn btn-accent w-100 py-2 mt-2">بدء الشفت</button>
+    </form>
+  </div>
+</div>
+<script>
+function getCookie(n){const v=`; ${document.cookie}`;const p=v.split(`; ${n}=`);if(p.length===2)return p.pop().split(';').shift();}
+document.getElementById('open-shift-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const cash = document.getElementById('id_starting_cash').value || 0;
+  const err = document.getElementById('error-box'); err.classList.add('d-none');
+  const res = await fetch("{% url 'open-shift' %}", {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({starting_cash: cash})
+  });
+  if(res.ok){ window.location.href = "{% url 'operator-dashboard' %}"; }
+  else{ const d = await res.json(); err.textContent = d.error || 'حدث خطأ، تأكد من البيانات.'; err.classList.remove('d-none'); }
+});
+</script>
+{% endblock %}

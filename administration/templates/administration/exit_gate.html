@@ -1,0 +1,110 @@
+{% extends "administration/base.html" %}
+{% block content %}
+<h3 class="fw-bold mb-4">🔴 بوابة الخروج - مباشر</h3>
+<div id="exit-card" class="card-panel p-4 text-center d-none" style="max-width:600px;margin:auto;">
+  <img id="exit-img" src="" class="img-fluid rounded mb-3" style="max-height:320px;object-fit:cover;">
+  <h1 id="exit-plate" class="fw-bold" style="letter-spacing:2px;"></h1>
+  <p class="text-secondary" id="exit-times"></p>
+  <h2 class="text-warning" id="exit-fee"></h2>
+  <button id="confirm-btn" class="btn btn-accent px-5 py-2 mt-3">✅ تم الدفع</button>
+  <p class="text-secondary mt-3" id="queue-count"></p>
+</div>
+<div id="exit-empty" class="text-center text-secondary mt-5"><h4>لا توجد سيارات في انتظار الدفع حاليًا</h4></div>
+<script>
+function getCookie(n){const v=`; ${document.cookie}`;const p=v.split(`; ${n}=`);if(p.length===2)return p.pop().split(';').shift();}
+let currentId = null;
+async function pollExit(){
+  try{
+    const res = await fetch("{% url 'gate-pending-exit' %}");
+    const data = await res.json();
+    const card = document.getElementById('exit-card');
+    const empty = document.getElementById('exit-empty');
+    if(data.current){
+      currentId = data.current.id;
+      empty.classList.add('d-none'); card.classList.remove('d-none');
+      document.getElementById('exit-img').src = data.current.exit_image_url || data.current.entry_image_url || '';
+      document.getElementById('exit-plate').textContent = data.current.license_plate;
+      document.getElementById('exit-times').textContent =
+        'دخول: ' + new Date(data.current.entry_time).toLocaleTimeString('ar-EG') +
+        '   |   خروج: ' + new Date(data.current.exit_time).toLocaleTimeString('ar-EG') +
+        '   |   المدة: ' + data.current.duration_minutes + ' دقيقة';
+      document.getElementById('exit-fee').textContent = 'المستحق: ' + data.current.total_fee + ' جنيه';
+      document.getElementById('queue-count').textContent = data.queue_count > 1 ? ('يوجد ' + (data.queue_count - 1) + ' سيارة أخرى في الانتظار') : '';
+    } else {
+      currentId = null; card.classList.add('d-none'); empty.classList.remove('d-none');
+    }
+  } catch(err){ console.error(err); }
+}
+document.getElementById('confirm-btn').addEventListener('click', async ()=>{
+  if(!currentId) return;
+  // غيّر البريفكس ده لو مسار parking urls مختلف عندك في core/urls.py
+  const res = await fetch(`/gate/exit/${currentId}/confirm-payment/`, {
+    method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}
+  });
+  if(res.ok){ pollExit(); }
+});
+pollExit(); setInterval(pollExit, 3000);
+</script>
+<hr class="my-5">
+<div class="card-panel p-4">
+  <h5 class="fw-bold mb-3">📋 سجل كل السيارات الخارجة</h5>
+  <div class="table-responsive">
+    <table class="table table-dark table-hover align-middle">
+      <thead>
+        <tr>
+          <th>#</th><th>اللوحة</th><th>وقت الدخول</th><th>وقت الخروج</th>
+          <th>المدة (د)</th><th>المبلغ</th><th>الدفع</th><th>حصّلها</th><th>الصورة</th>
+        </tr>
+      </thead>
+      <tbody id="exits-table-body"></tbody>
+    </table>
+  </div>
+  <nav><ul class="pagination justify-content-center" id="exits-pagination"></ul></nav>
+</div>
+
+<script>
+async function loadExitsHistory(page=1){
+  const res = await fetch(`{% url 'gate-exits-history' %}?page=${page}`);
+  const data = await res.json();
+  const tbody = document.getElementById('exits-table-body');
+  tbody.innerHTML = '';
+  data.results.forEach(row => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${row.id}</td>
+        <td class="fw-bold">${row.license_plate}</td>
+        <td>${new Date(row.entry_time).toLocaleString('ar-EG')}</td>
+        <td>${new Date(row.exit_time).toLocaleString('ar-EG')}</td>
+        <td>${row.duration_minutes ?? '—'}</td>
+        <td>${row.total_fee} ج.م</td>
+        <td>${row.is_paid ? '<span class="badge bg-success">مدفوع</span>' : '<span class="badge bg-danger">غير مدفوع</span>'}</td>
+        <td>${row.collected_by_username || '—'}</td>
+        <td>${row.exit_image_url ? `<a href="${row.exit_image_url}" target="_blank">عرض</a>` : '—'}</td>
+      </tr>`;
+  });
+  renderPagination('exits-pagination', data.count, page, 10, loadExitsHistory);
+}
+
+function renderPagination(containerId, totalCount, currentPage, pageSize, onPageClick){
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  const addPage = (label, page, disabled=false, active=false) => {
+    const li = document.createElement('li');
+    li.className = `page-item ${disabled?'disabled':''} ${active?'active':''}`;
+    const a = document.createElement('a');
+    a.className = 'page-link'; a.href = '#'; a.textContent = label;
+    a.style.cursor = 'pointer';
+    if(!disabled && !active) a.onclick = (e)=>{ e.preventDefault(); onPageClick(page); };
+    li.appendChild(a); el.appendChild(li);
+  };
+  addPage('السابق', currentPage-1, currentPage<=1);
+  const start = Math.max(1, currentPage-2);
+  const end = Math.min(totalPages, currentPage+2);
+  for(let p=start; p<=end; p++) addPage(p, p, false, p===currentPage);
+  addPage('التالي', currentPage+1, currentPage>=totalPages);
+}
+
+loadExitsHistory();
+</script>
+{% endblock %}
