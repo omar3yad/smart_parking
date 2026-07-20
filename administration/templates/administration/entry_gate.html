@@ -1,3 +1,4 @@
+<!-- /root/Smart-Parking-System/smart-parking-system-main/administration/templates/administration/entry_gate.html -->
 {% extends "administration/base.html" %}
 {% block content %}
 <h3 class="fw-bold mb-4">🟢 بوابة الدخول - مباشر</h3>
@@ -9,23 +10,44 @@
 </div>
 <div id="entry-empty" class="text-center text-secondary mt-5"><h4>في انتظار دخول سيارة جديدة...</h4></div>
 <script>
-let lastShownId = null;
-async function pollEntries(){
-  try{
-    const res = await fetch("{% url 'gate-recent-entries' %}");
-    const data = await res.json();
-    if(data.length && data[0].id !== lastShownId){
-      lastShownId = data[0].id;
-      const e = data[0];
-      document.getElementById('entry-empty').classList.add('d-none');
-      document.getElementById('entry-card').classList.remove('d-none');
-      document.getElementById('entry-img').src = e.entry_image_url || '';
-      document.getElementById('entry-plate').textContent = e.license_plate;
-      document.getElementById('entry-time').textContent = 'وقت الدخول: ' + new Date(e.entry_time).toLocaleTimeString('ar-EG');
-    }
-  } catch(err){ console.error(err); }
+async function insertNewEntry(e){
+  document.getElementById('entry-empty').classList.add('d-none');
+  document.getElementById('entry-card').classList.remove('d-none');
+  document.getElementById('entry-img').src = e.entry_image_url || '';
+  document.getElementById('entry-plate').textContent = e.license_plate;
+  document.getElementById('entry-time').textContent = 'وقت الدخول: ' + new Date(e.entry_time).toLocaleTimeString('ar-EG');
+  // حدّث السجل الكامل تحت كمان بدون ما نعمل reload كامل
+  prependEntryRow(e);
 }
-pollEntries(); setInterval(pollEntries, 3000);
+
+function prependEntryRow(e){
+  const tbody = document.getElementById('entries-table-body');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${e.id}</td>
+    <td class="fw-bold">${e.license_plate}</td>
+    <td>${new Date(e.entry_time).toLocaleString('ar-EG')}</td>
+    <td>${e.entry_image_url ? `<a href="${e.entry_image_url}" target="_blank">عرض</a>` : '—'}</td>`;
+  tbody.prepend(tr);
+}
+
+function connectEntryStream(){
+  const source = new EventSource("{% url 'entry-gate-stream' %}");
+
+  source.addEventListener('vehicle_entered', (e) => {
+    const data = JSON.parse(e.data);
+    insertNewEntry(data);
+  });
+
+  source.onerror = () => {
+    console.warn('SSE connection lost, retrying...');
+    // EventSource بيعمل retry تلقائي، بس نقفل ونفتح من جديد لو الحالة اتقفلت خالص
+    if (source.readyState === EventSource.CLOSED) {
+      setTimeout(connectEntryStream, 3000);
+    }
+  };
+}
+connectEntryStream();
 </script>
 <hr class="my-5">
 <div class="card-panel p-4">

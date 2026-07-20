@@ -266,6 +266,7 @@ JSON
 │   ├── models.py
 │   ├── permissions.py
 │   ├── serializers.py
+│   ├── sse_views.py
 │   ├── templates
 │   │   └── administration
 │   │       ├── base.html
@@ -286,7 +287,9 @@ JSON
 ├── core
 │   ├── __init__.py
 │   ├── asgi.py
+│   ├── redis_client.py
 │   ├── settings.py
+│   ├── sse.py
 │   ├── urls.py
 │   └── wsgi.py
 ├── manage.py
@@ -294,6 +297,7 @@ JSON
 │   ├── entry_pics
 │   ├── exit_image
 │   └── exit_pics
+
 ├── parking
 │   ├── admin.py
 │   ├── apps.py
@@ -309,6 +313,7 @@ JSON
 │   ├── permissions.py
 │   ├── populate_slots.sql
 │   ├── serializers.py
+│   ├── sse_views.py
 │   ├── test.html
 │   ├── urls.py
 │   └── views.py
@@ -316,5 +321,5 @@ JSON
 ├── smart_parking_db_2026-05-14_212003.sql
 └── tracking_debug.log
 
-21 directories, 70 files
+22 directories, 85 files
 ```

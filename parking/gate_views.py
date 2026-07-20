@@ -1,14 +1,13 @@
-from django.utils import timezone
+# /root/Smart-Parking-System/smart-parking-system-main/parking/gate_views.py
 from datetime import timedelta
-from rest_framework import permissions, status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-
 from .models import VehicleLog
+from django.utils import timezone
 from accounts.models import Shift
+from rest_framework.views import APIView
+from core.redis_client import publish_event
+from rest_framework.response import Response
+from rest_framework import permissions, status
 from .gate_serializers import GateEntrySerializer, GateExitSerializer
-
-
 class RecentEntriesAPIView(APIView):
     """آخر سيارة داخلة خلال آخر دقيقتين - لبوابة الدخول"""
     permission_classes = [permissions.IsAuthenticated]
@@ -48,6 +47,13 @@ class ConfirmExitPaymentAPIView(APIView):
         if not log.exit_shift and active_shift:
             log.exit_shift = active_shift
         log.save()
+                # ── نشر الحدث لحظيًا على قناة الدفع ──
+        publish_event('parking:payment', 'payment_confirmed', {
+            "id": log.id,
+            "license_plate": log.license_plate,
+            "collected_by": request.user.username,
+            "total_fee": float(log.total_fee),
+        })
         return Response({"status": "success", "message": "تم تأكيد الدفع بنجاح."})
 
 # ضيف الاستيرادات دي فوق الملف

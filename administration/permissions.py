@@ -1,5 +1,5 @@
+# /root/Smart-Parking-System/smart-parking-system-main/administration/permissions.py
 from rest_framework import permissions
-
 
 class IsAdminUser(permissions.BasePermission):
     """

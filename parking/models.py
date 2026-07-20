@@ -116,13 +116,13 @@ class VehicleLog(models.Model):
         remaining_minutes = total_minutes % 60
         
         # 2. تطبيق قاعدة الـ 7 دقائق سماح على الدقائق المتبقية
-        if remaining_minutes > 0:
+        if remaining_minutes > 7:
             billable_hours = hours + 1
         else:
             billable_hours = hours
             
         # إذا كانت المدة الإجمالية أقل من أو تساوي 7 دقائق من البداية (دخل وخرج فوراً)
-        if billable_hours == 0 and total_minutes <= 0:
+        if billable_hours == 0 and total_minutes <= 7:
             self.total_fee = 0.00
             return self.total_fee
 

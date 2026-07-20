@@ -1,4 +1,3 @@
-# /root/Smart-Parking-System/smart-parking-system-main/parking/views.py
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser # 👈 استيراد البارسرز المهمة للملفات
 from rest_framework.generics import ListAPIView
@@ -20,8 +19,8 @@ from .models import ParkingSlot, VehicleLog, Reservation,Camera
 from .pathfinding import astar, get_road_cell_next_to_slot
 from .permissions import IsCameraNode, IsOwnerOrAdmin
 from .grid import GARAGE_GRID, SLOT_COORDINATES
+from core.redis_client import publish_event
 from accounts.models import Shift
-
 import numpy as np
 import logging
 import json
@@ -42,8 +41,9 @@ SIMILAR_COLORS = {
     'red':    ['red', 'brown'],
     'green':  ['green'],
 }
+# /root/Smart-Parking-System/smart-parking-system-main/parking/views.py
 
-
+from core.redis_client import publish_event
 class VehicleEntryAPIView(APIView):
     permission_classes = [IsCameraNode]
     
@@ -77,6 +77,14 @@ class VehicleEntryAPIView(APIView):
                 status='parked',  # أو moving حسب دورتك
                 entry_shift=active_shift  # ربط العربية بالشفت اللي دخلت فيه
             )
+                        # ── نشر الحدث لحظيًا على قناة الدخول ──
+            publish_event('parking:entry', 'vehicle_entered', {
+                "id": vehicle_log.id,
+                "license_plate": vehicle_log.license_plate,
+                "entry_image_url": request.build_absolute_uri(vehicle_log.entry_image.url) if vehicle_log.entry_image else None,
+                "entry_time": vehicle_log.entry_time.isoformat(),
+                "car_color": vehicle_log.car_color,
+            })
 
             return Response({
                 "status": "success",
@@ -85,7 +93,6 @@ class VehicleEntryAPIView(APIView):
             }, status=status.HTTP_201_CREATED)
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class VehicleExitAPIView(APIView):
@@ -134,6 +141,18 @@ class VehicleExitAPIView(APIView):
                 # حفظ كل التعديلات نهائياً في قاعدة البيانات
                 log.save()
 
+            # ── نشر الحدث لحظيًا على قناة الخروج ──
+            duration_minutes = int((log.exit_time - log.entry_time).total_seconds() // 60)
+            publish_event('parking:exit', 'vehicle_exited', {
+                "id": log.id,
+                "license_plate": log.license_plate,
+                "entry_time": log.entry_time.isoformat(),
+                "exit_time": log.exit_time.isoformat(),
+                "duration_minutes": duration_minutes,
+                "total_fee": float(log.total_fee),
+                "exit_image_url": request.build_absolute_uri(log.exit_image.url) if log.exit_image else None,
+                "entry_image_url": request.build_absolute_uri(log.entry_image.url) if log.entry_image else None,
+            })
             return Response({
                 "status": "success",
                 "message": "تم تسجيل الخروج بنجاح",
@@ -147,6 +166,7 @@ class VehicleExitAPIView(APIView):
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class BulkSlotUpdateAPIView(APIView):
     """

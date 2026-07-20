@@ -4,17 +4,24 @@ from datetime import timedelta
 from django.utils import timezone
 from accounts.models import Shift
 from rest_framework import status
+from rest_framework import permissions
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
 from django.db.models import Sum, Count, Avg
 from rest_framework.response import Response
+from accounts.views import build_shift_report
 from django.shortcuts import render, redirect
+from .serializers import AdminShiftSerializer
+from .serializers import AdminShiftSerializer
 from rest_framework.generics import ListAPIView
+from django.db.models import F, Value, CharField
 from .permissions import IsAdminUser, IsSuperAdmin
 from django.contrib.auth.decorators import login_required
+from rest_framework.pagination import PageNumberPagination
 from django.views.decorators.csrf import ensure_csrf_cookie
 from parking.models import ParkingSlot, VehicleLog, Reservation
 from django.db.models.functions import TruncDay, TruncMonth, TruncHour
+
 from .serializers import (
     AdminVehicleLogSerializer,
     AdminSlotSerializer,
@@ -23,6 +30,13 @@ from .serializers import (
     AdminReservationSerializer,
 )
 
+
+# ضيف الاستيراد ده فوق
+
+class AdminLogsPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = 'page_size'
+    max_page_size = 50
 
 # ─────────────────────────────────────────────
 # 1. GARAGE LIVE STATS
@@ -222,40 +236,37 @@ class AdminPaymentAnalyticsAPIView(APIView):
 #   ?status=exited   → already left
 # ─────────────────────────────────────────────
 class AdminVehicleLogListAPIView(ListAPIView):
-    """
-    Full paginated list of all vehicle logs for admin review.
-    Shows entry photos, exit photos, fees, and duration.
-    """
     permission_classes = [IsAdminUser]
     serializer_class = AdminVehicleLogSerializer
+    pagination_class = AdminLogsPagination
 
     def get_queryset(self):
-        qs = VehicleLog.objects.select_related('slot').order_by('-entry_time')
+        qs = VehicleLog.objects.select_related('slot', 'collected_by', 'entry_shift', 'exit_shift').order_by('-entry_time')
 
-        # Filter by date
         date = self.request.query_params.get('date')
         if date:
             qs = qs.filter(entry_time__date=date)
 
-        # Filter by license plate
         plate = self.request.query_params.get('plate')
         if plate:
             qs = qs.filter(license_plate__icontains=plate)
 
-        # Filter by inside/exited status
         log_status = self.request.query_params.get('status')
         if log_status == 'inside':
             qs = qs.filter(exit_time__isnull=True)
         elif log_status == 'exited':
             qs = qs.filter(exit_time__isnull=False)
 
+        is_paid = self.request.query_params.get('is_paid')
+        if is_paid == 'true':
+            qs = qs.filter(is_paid=True)
+        elif is_paid == 'false':
+            qs = qs.filter(is_paid=False)
+
         return qs
 
     def get_serializer_context(self):
-        # Pass request to serializer so image URLs are absolute
         return {'request': self.request}
-
-
 # ─────────────────────────────────────────────
 # 4. SLOT MANAGEMENT
 # GET  /api/admin/slots/          → list all slots
@@ -431,12 +442,6 @@ def exit_gate_view(request):
     return render(request, 'administration/exit_gate.html')
 
 
-# ضيف الاستيرادات دي فوق (لو ناقصة)
-from rest_framework import permissions
-from rest_framework.pagination import PageNumberPagination
-from django.db.models import F, Value, CharField
-
-
 class OperationsPagination(PageNumberPagination):
     page_size = 15
     page_size_query_param = 'page_size'
@@ -466,3 +471,70 @@ class OperationsLogAPIView(APIView):
         paginator = OperationsPagination()
         page = paginator.paginate_queryset(combined, request)
         return paginator.get_paginated_response(list(page))
+
+
+# ─────────────────────────────────────────────
+# 9. SHIFTS HISTORY (للأدمن - كل الشفتات، مقفولة ومفتوحة)
+# GET /api/admin/shifts/
+# Query params: ?is_closed=true|false  &employee=<username>
+# ─────────────────────────────────────────────
+class AdminShiftListAPIView(ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = AdminShiftSerializer
+    pagination_class = AdminLogsPagination
+
+    def get_queryset(self):
+        qs = Shift.objects.select_related('employee').order_by('-start_time')
+
+        is_closed = self.request.query_params.get('is_closed')
+        if is_closed == 'true':
+            qs = qs.filter(is_closed=True)
+        elif is_closed == 'false':
+            qs = qs.filter(is_closed=False)
+
+        employee = self.request.query_params.get('employee')
+        if employee:
+            qs = qs.filter(employee__username__icontains=employee)
+
+        return qs
+
+
+# ─────────────────────────────────────────────
+# 10. SHIFT DETAIL REPORT (تقرير شفت واحد بالتفصيل)
+# GET /api/admin/shifts/<id>/report/
+# ─────────────────────────────────────────────
+class AdminShiftReportAPIView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, pk):
+        try:
+            shift = Shift.objects.select_related('employee').get(pk=pk)
+        except Shift.DoesNotExist:
+            return Response({"error": "الشفت غير موجود."}, status=status.HTTP_404_NOT_FOUND)
+
+        report = build_shift_report(shift, actual_cash=shift.actual_collected_cash)
+        return Response(report)
+
+
+# ─────────────────────────────────────────────
+# 11. UPDATE STAFF ACCESS (تفعيل/تعطيل موظف)
+# PATCH /api/admin/users/<id>/toggle-active/
+# ─────────────────────────────────────────────
+class ToggleUserActiveAPIView(APIView):
+    permission_classes = [IsSuperAdmin]
+
+    def patch(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response({"error": "المستخدم غير موجود."}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.id == request.user.id:
+            return Response({"error": "لا يمكنك تعطيل حسابك الخاص."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.is_active = not user.is_active
+        user.save()
+        return Response({
+            "message": f"تم {'تفعيل' if user.is_active else 'تعطيل'} الحساب بنجاح.",
+            "user": AdminUserSerializer(user).data
+        })

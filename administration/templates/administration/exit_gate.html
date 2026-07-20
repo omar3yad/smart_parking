@@ -1,3 +1,4 @@
+<!-- /root/Smart-Parking-System/smart-parking-system-main/administration/templates/administration/exit_gate.html -->
 {% extends "administration/base.html" %}
 {% block content %}
 <h3 class="fw-bold mb-4">🔴 بوابة الخروج - مباشر</h3>
@@ -13,37 +14,52 @@
 <script>
 function getCookie(n){const v=`; ${document.cookie}`;const p=v.split(`; ${n}=`);if(p.length===2)return p.pop().split(';').shift();}
 let currentId = null;
-async function pollExit(){
-  try{
-    const res = await fetch("{% url 'gate-pending-exit' %}");
-    const data = await res.json();
-    const card = document.getElementById('exit-card');
-    const empty = document.getElementById('exit-empty');
-    if(data.current){
-      currentId = data.current.id;
-      empty.classList.add('d-none'); card.classList.remove('d-none');
-      document.getElementById('exit-img').src = data.current.exit_image_url || data.current.entry_image_url || '';
-      document.getElementById('exit-plate').textContent = data.current.license_plate;
-      document.getElementById('exit-times').textContent =
-        'دخول: ' + new Date(data.current.entry_time).toLocaleTimeString('ar-EG') +
-        '   |   خروج: ' + new Date(data.current.exit_time).toLocaleTimeString('ar-EG') +
-        '   |   المدة: ' + data.current.duration_minutes + ' دقيقة';
-      document.getElementById('exit-fee').textContent = 'المستحق: ' + data.current.total_fee + ' جنيه';
-      document.getElementById('queue-count').textContent = data.queue_count > 1 ? ('يوجد ' + (data.queue_count - 1) + ' سيارة أخرى في الانتظار') : '';
-    } else {
-      currentId = null; card.classList.add('d-none'); empty.classList.remove('d-none');
-    }
-  } catch(err){ console.error(err); }
+
+function renderExitCard(d){
+  currentId = d.id;
+  document.getElementById('exit-empty').classList.add('d-none');
+  document.getElementById('exit-card').classList.remove('d-none');
+  document.getElementById('exit-img').src = d.exit_image_url || d.entry_image_url || '';
+  document.getElementById('exit-plate').textContent = d.license_plate;
+  document.getElementById('exit-times').textContent =
+    'دخول: ' + new Date(d.entry_time).toLocaleTimeString('ar-EG') +
+    '   |   خروج: ' + new Date(d.exit_time).toLocaleTimeString('ar-EG') +
+    '   |   المدة: ' + d.duration_minutes + ' دقيقة';
+  document.getElementById('exit-fee').textContent = 'المستحق: ' + d.total_fee + ' جنيه';
 }
+
+function clearExitCard(){
+  currentId = null;
+  document.getElementById('exit-card').classList.add('d-none');
+  document.getElementById('exit-empty').classList.remove('d-none');
+}
+
 document.getElementById('confirm-btn').addEventListener('click', async ()=>{
   if(!currentId) return;
-  // غيّر البريفكس ده لو مسار parking urls مختلف عندك في core/urls.py
   const res = await fetch(`/gate/exit/${currentId}/confirm-payment/`, {
     method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}
   });
-  if(res.ok){ pollExit(); }
+  // مفيش داعي نعمل حاجة هنا — الـ SSE هيبعتلنا تحديث الحالة تلقائيًا (payment_confirmed)
 });
-pollExit(); setInterval(pollExit, 3000);
+
+function connectExitStream(){
+  const source = new EventSource("{% url 'exit-gate-stream' %}");
+
+  source.addEventListener('vehicle_exited', (e) => {
+    renderExitCard(JSON.parse(e.data));
+  });
+
+  source.addEventListener('payment_confirmed', (e) => {
+    const d = JSON.parse(e.data);
+    if (d.id === currentId) clearExitCard();
+    prependExitRow(d); // اختياري: لو عايز تحدث الجدول تحت لحظيًا
+  });
+
+  source.onerror = () => {
+    if (source.readyState === EventSource.CLOSED) setTimeout(connectExitStream, 3000);
+  };
+}
+connectExitStream();
 </script>
 <hr class="my-5">
 <div class="card-panel p-4">

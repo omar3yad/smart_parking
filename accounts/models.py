@@ -1,9 +1,5 @@
+# /root/Smart-Parking-System/smart-parking-system-main/accounts/models.py
 from django.db import models
-
-# Create your models here.
-# EmployeeProfile
-
-# accounts/models.py (أو يمكنك وضعه في administration/models.py)
 from django.db import models
 from django.contrib.auth.models import User
 

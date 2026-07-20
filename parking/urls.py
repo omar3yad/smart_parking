@@ -12,9 +12,10 @@ from .views import CreateReservationAPIView
 from .views import MyReservationsListAPIView
 from .views import UserCurrentLocationAPIView
 from .views import UpdateEntryEmbeddingAPIView
+from .sse_views import entry_gate_stream, exit_gate_stream
 from .gate_views import EntriesHistoryAPIView, ExitsHistoryAPIView
 from .gate_views import RecentEntriesAPIView, PendingExitAPIView, ConfirmExitPaymentAPIView
-
+# /root/Smart-Parking-System/smart-parking-system-main/parking/urls.py
 urlpatterns = [
 
     path('api/entry/', VehicleEntryAPIView.as_view(), name='vehicle-entry'),
@@ -41,4 +42,6 @@ urlpatterns = [
     path('gate/entries/history/', EntriesHistoryAPIView.as_view(), name='gate-entries-history'),
     path('gate/exits/history/', ExitsHistoryAPIView.as_view(), name='gate-exits-history'),
 
+    path('gate/entry/stream/', entry_gate_stream, name='entry-gate-stream'),
+    path('gate/exit/stream/', exit_gate_stream, name='exit-gate-stream'),
 ]
